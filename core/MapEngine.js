@@ -1,42 +1,43 @@
 /**
  * MapEngine.js — Core SVG renderer.
- * Handles zoom, pan, rotate, compass sync, and mounts a CountryModule.
- * All rendering delegates to RegionRenderer, LandmarkRenderer, TemperatureEngine.
+ * Tooltip instance injected from MapUI so renderers can wire hover events.
  */
-import Projection      from '../utils/projection.js';
+import Projection        from '../utils/projection.js';
 import { clampTransform, zoomAt, buildTransform } from '../utils/geoMath.js';
-import RegionRenderer  from './RegionRenderer.js';
-import LandmarkRenderer from './LandmarkRenderer.js';
+import RegionRenderer    from './RegionRenderer.js';
+import LandmarkRenderer  from './LandmarkRenderer.js';
 import TemperatureEngine from './TemperatureEngine.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
+const MONTHS = [
+  'January','February','March','April','May','June',
+  'July','August','September','October','November','December',
+];
+
 export default class MapEngine {
 
   /**
-   * @param {HTMLElement} container   The element that holds the SVG
-   * @param {HTMLElement} compassEl   The compass SVG element
+   * @param {HTMLElement} container
+   * @param {HTMLElement} compassEl
+   * @param {Tooltip}     tooltip    Tooltip instance from MapUI
    */
-  constructor(container, compassEl) {
+  constructor(container, compassEl, tooltip) {
     this.container  = container;
     this.compassEl  = compassEl;
+    this.tooltip    = tooltip;       // ← injected
     this.module     = null;
     this.projection = null;
     this.svg        = null;
-    this.transform  = { tx: 0, ty: 0, scale: 1, rotation: 0 };
+    this.transform  = { tx:0, ty:0, scale:1, rotation:0 };
     this._dragging  = false;
-    this._lastX = 0;
-    this._lastY = 0;
-    this._lastDist  = 0;
+    this._lastX = 0; this._lastY = 0; this._lastDist = 0;
   }
 
   // ── Module lifecycle ───────────────────────────────────────────────────────
 
   async mount(module) {
-    if (this.module) {
-      this.module.onUnload();
-      this._detachEvents();
-    }
+    if (this.module) { this.module.onUnload(); this._detachEvents(); }
     this.module = module;
     await module.onLoad();
 
@@ -64,9 +65,7 @@ export default class MapEngine {
     this.svg.setAttribute('width', w);
     this.svg.setAttribute('height', h);
     this.svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
-    this.svg.style.position = 'absolute';
-    this.svg.style.top = '0';
-    this.svg.style.left = '0';
+    this.svg.style.cssText = 'position:absolute;top:0;left:0;';
     this.container.appendChild(this.svg);
   }
 
@@ -80,7 +79,6 @@ export default class MapEngine {
     g.setAttribute('id', 'map-root');
     this.svg.appendChild(g);
 
-    // Background
     const { width: W, height: H } = this.module.getCanvasSize();
     const bg = document.createElementNS(SVG_NS, 'rect');
     bg.setAttribute('x', 0); bg.setAttribute('y', 0);
@@ -88,13 +86,18 @@ export default class MapEngine {
     bg.setAttribute('fill', '#1a3a5c');
     g.appendChild(bg);
 
-    // Layers
-    RegionRenderer.render(g, this.module.regions,      this.projection);
-    RegionRenderer.renderWater(g, this.module.waterBodies, this.projection);
+    const month     = this._currentMonth();
+    const monthName = MONTHS[month];
+
+    RegionRenderer.render(g,       this.module.regions,       this.projection);
+    RegionRenderer.renderWater(g,  this.module.waterBodies,   this.projection);
     RegionRenderer.renderLabels(g, this.module.terrainLabels, this.projection);
-    LandmarkRenderer.renderCities(g, this.module.cities, this.projection,
-      this._currentMonth());
-    LandmarkRenderer.renderLandmarks(g, this.module.landmarks, this.projection);
+
+    // Pass tooltip + monthName into renderers
+    LandmarkRenderer.renderCities(
+      g, this.module.cities, this.projection, month, this.tooltip, monthName);
+    LandmarkRenderer.renderLandmarks(
+      g, this.module.landmarks, this.projection, this.tooltip);
 
     this._applyTransform();
   }
@@ -106,7 +109,7 @@ export default class MapEngine {
     if (!root) return;
     const { width: W, height: H } = this.module.getCanvasSize();
     root.setAttribute('transform',
-      buildTransform({ ...this.transform, cx: W / 2, cy: H / 2 }));
+      buildTransform({ ...this.transform, cx: W/2, cy: H/2 }));
     this._syncCompass();
   }
 
@@ -127,35 +130,28 @@ export default class MapEngine {
   _clamp() {
     const { width: W, height: H } = this.module.getCanvasSize();
     const vp = { width: this.container.clientWidth, height: this.container.clientHeight };
-    const clamped = clampTransform(this.transform, { W, H }, vp);
-    this.transform = { ...this.transform, ...clamped };
+    const c  = clampTransform(this.transform, { W, H }, vp);
+    this.transform = { ...this.transform, ...c };
   }
 
   // ── Public controls ────────────────────────────────────────────────────────
 
-  zoomIn()  { this._zoomBy(1.35); }
-  zoomOut() { this._zoomBy(1 / 1.35); }
-
+  zoomIn()      { this._zoomBy(1.35); }
+  zoomOut()     { this._zoomBy(1 / 1.35); }
   rotateLeft()  { this.transform.rotation = (this.transform.rotation - 15 + 360) % 360; this._applyTransform(); }
   rotateRight() { this.transform.rotation = (this.transform.rotation + 15) % 360;       this._applyTransform(); }
+  reset()       { this.transform.rotation = 0; this._fitToContainer(); }
 
-  reset() {
-    this.transform.rotation = 0;
-    this._fitToContainer();
-  }
-
-  /** Called by TemperatureEngine when month changes — re-renders city layer only. */
   refreshCities() { this._render(); }
 
   // ── Zoom helper ────────────────────────────────────────────────────────────
 
   _zoomBy(factor) {
-    const vw = this.container.clientWidth;
-    const vh = this.container.clientHeight;
+    const vw = this.container.clientWidth, vh = this.container.clientHeight;
     const { width: W, height: H } = this.module.getCanvasSize();
     const minScale = Math.max(vw / W, vh / H);
     const newScale = Math.min(Math.max(this.transform.scale * factor, minScale), 8);
-    const updated = zoomAt(this.transform, newScale / this.transform.scale, vw / 2, vh / 2);
+    const updated  = zoomAt(this.transform, newScale / this.transform.scale, vw/2, vh/2);
     this.transform = { ...this.transform, ...updated };
     this._clamp();
     this._applyTransform();
@@ -175,7 +171,7 @@ export default class MapEngine {
     return TemperatureEngine.currentMonth ?? new Date().getMonth();
   }
 
-  // ── Event handling ─────────────────────────────────────────────────────────
+  // ── Events ─────────────────────────────────────────────────────────────────
 
   _attachEvents() {
     this._onMouseDown = e => { this._dragging = true; this._lastX = e.clientX; this._lastY = e.clientY; };
@@ -185,29 +181,27 @@ export default class MapEngine {
       this.transform.tx += e.clientX - this._lastX;
       this.transform.ty += e.clientY - this._lastY;
       this._lastX = e.clientX; this._lastY = e.clientY;
-      this._clamp();
-      this._applyTransform();
+      this._clamp(); this._applyTransform();
     };
     this._onWheel = e => {
       e.preventDefault();
       const rect = this.container.getBoundingClientRect();
       const fx = e.clientX - rect.left, fy = e.clientY - rect.top;
-      const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
       const { width: W, height: H } = this.module.getCanvasSize();
       const vw = this.container.clientWidth, vh = this.container.clientHeight;
       const minScale = Math.max(vw / W, vh / H);
+      const factor   = e.deltaY < 0 ? 1.15 : 1/1.15;
       const newScale = Math.min(Math.max(this.transform.scale * factor, minScale), 8);
-      const updated = zoomAt(this.transform, newScale / this.transform.scale, fx, fy);
+      const updated  = zoomAt(this.transform, newScale / this.transform.scale, fx, fy);
       this.transform = { ...this.transform, ...updated };
-      this._clamp();
-      this._applyTransform();
+      this._clamp(); this._applyTransform();
     };
     this._onTouchStart = e => {
       if (e.touches.length === 1) { this._dragging = true; this._lastX = e.touches[0].clientX; this._lastY = e.touches[0].clientY; }
-      if (e.touches.length === 2) this._lastDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      if (e.touches.length === 2) this._lastDist = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
     };
-    this._onTouchEnd   = () => { this._dragging = false; };
-    this._onTouchMove  = e => {
+    this._onTouchEnd  = () => { this._dragging = false; };
+    this._onTouchMove = e => {
       if (e.touches.length === 1 && this._dragging) {
         this.transform.tx += e.touches[0].clientX - this._lastX;
         this.transform.ty += e.touches[0].clientY - this._lastY;
@@ -215,13 +209,12 @@ export default class MapEngine {
         this._clamp(); this._applyTransform();
       }
       if (e.touches.length === 2) {
-        const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-        const factor = d / this._lastDist;
-        this._lastDist = d;
+        const d = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
         const { width: W, height: H } = this.module.getCanvasSize();
         const vw = this.container.clientWidth, vh = this.container.clientHeight;
-        const minScale = Math.max(vw / W, vh / H);
-        this.transform.scale = Math.min(Math.max(this.transform.scale * factor, minScale), 8);
+        const minScale = Math.max(vw/W, vh/H);
+        this.transform.scale = Math.min(Math.max(this.transform.scale*(d/this._lastDist), minScale), 8);
+        this._lastDist = d;
         this._clamp(); this._applyTransform();
       }
     };
@@ -229,10 +222,10 @@ export default class MapEngine {
     this.container.addEventListener('mousedown',  this._onMouseDown);
     window.addEventListener('mouseup',            this._onMouseUp);
     window.addEventListener('mousemove',          this._onMouseMove);
-    this.container.addEventListener('wheel',      this._onWheel, { passive: false });
-    this.container.addEventListener('touchstart', this._onTouchStart, { passive: true });
-    this.container.addEventListener('touchend',   this._onTouchEnd,   { passive: true });
-    this.container.addEventListener('touchmove',  this._onTouchMove,  { passive: true });
+    this.container.addEventListener('wheel',      this._onWheel, { passive:false });
+    this.container.addEventListener('touchstart', this._onTouchStart, { passive:true });
+    this.container.addEventListener('touchend',   this._onTouchEnd,   { passive:true });
+    this.container.addEventListener('touchmove',  this._onTouchMove,  { passive:true });
   }
 
   _detachEvents() {

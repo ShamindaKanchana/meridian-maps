@@ -105,9 +105,9 @@ export default class MapUI {
     });
     this.tempEng.updateAvgDisplay(module.cities, avgBadge);
 
-    // Map engine
+    // Map engine — pass tooltip so renderers can wire hover events
     const compassEl = this.container.querySelector('#compass-svg');
-    this.engine = new MapEngine(mapBody, compassEl);
+    this.engine = new MapEngine(mapBody, compassEl, this.tooltip);
     await this.engine.mount(module);
 
     // Legend
