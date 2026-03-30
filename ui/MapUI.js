@@ -126,6 +126,39 @@ export default class MapUI {
   _buildLegend(module) {
     const leg = this.container.querySelector('#map-legend');
     const iconTypes = [...new Set(module.landmarks.map(l => l.iconType))];
+
+    // SVG icon per landmark type — matches LandmarkRenderer shapes
+    const iconSvg = {
+      pyramid: `<svg width="16" height="14" viewBox="0 0 16 14">
+        <polygon points="8,1 15,13 1,13" fill="#d4a855" stroke="#8B6914" stroke-width="0.8"/>
+        <polygon points="8,1 15,13 8,13" fill="rgba(0,0,0,0.18)"/>
+      </svg>`,
+      temple: `<svg width="16" height="14" viewBox="0 0 16 14">
+        <rect x="1" y="10" width="14" height="3" fill="#a07840" rx="1"/>
+        <rect x="2" y="5" width="12" height="5" fill="#c8a96e" stroke="#8B6914" stroke-width="0.5"/>
+        <polygon points="2,5 14,5 8,1" fill="#b8922a" stroke="#8B6914" stroke-width="0.5"/>
+        <rect x="4" y="5" width="2" height="5" fill="#e8c87a"/>
+        <rect x="7" y="5" width="2" height="5" fill="#e8c87a"/>
+        <rect x="10" y="5" width="2" height="5" fill="#e8c87a"/>
+      </svg>`,
+      monument: `<svg width="16" height="14" viewBox="0 0 16 14">
+        <polygon points="8,1 10.5,13 5.5,13" fill="#e8d09a" stroke="#a09060" stroke-width="0.6"/>
+        <polygon points="8,1 7,3.5 9,3.5" fill="#ffe066" opacity="0.9"/>
+      </svg>`,
+      castle: `<svg width="16" height="14" viewBox="0 0 16 14">
+        <rect x="2" y="5" width="12" height="8" fill="#9e8b6e" stroke="#6e5b4e" stroke-width="0.6"/>
+        <rect x="2" y="2" width="2.5" height="3" fill="#9e8b6e" stroke="#6e5b4e" stroke-width="0.5"/>
+        <rect x="6" y="2" width="2.5" height="3" fill="#9e8b6e" stroke="#6e5b4e" stroke-width="0.5"/>
+        <rect x="10" y="2" width="2.5" height="3" fill="#9e8b6e" stroke="#6e5b4e" stroke-width="0.5"/>
+        <rect x="6" y="9" width="4" height="4" fill="#3a2a1a" rx="1"/>
+      </svg>`,
+      volcano: `<svg width="16" height="14" viewBox="0 0 16 14">
+        <polygon points="8,1 15,13 1,13" fill="#7a4a2a" stroke="#4a2a0a" stroke-width="0.8"/>
+        <polygon points="8,1 6,4.5 10,4.5" fill="#ff6600" opacity="0.85"/>
+        <circle cx="8" cy="1.5" r="1.5" fill="#ff3300" opacity="0.9"/>
+      </svg>`,
+    };
+
     leg.innerHTML = `
       <div class="leg-item">
         <span class="leg-dot" style="background:#ff4444;border:2px solid #fff"></span> Capital
@@ -138,9 +171,7 @@ export default class MapUI {
       </div>
       ${iconTypes.map(t => `
       <div class="leg-item">
-        <svg width="14" height="14" viewBox="0 0 14 14">
-          <polygon points="7,1 13,13 1,13" fill="#d4a855" stroke="#8B6914" stroke-width="0.8"/>
-        </svg>
+        ${iconSvg[t] ?? iconSvg.monument}
         ${t.charAt(0).toUpperCase() + t.slice(1)}
       </div>`).join('')}
     `;
