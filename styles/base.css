@@ -1,0 +1,38 @@
+
+/* ═══════════════════════════════════════════════
+   base.css — Global reset + CSS variables
+═══════════════════════════════════════════════ */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --gold:       #D4A017;
+  --gold-dark:  #8B6914;
+  --brown:      #8B4513;
+  --bg-deep:    #1a0a00;
+  --bg-mid:     #2a1200;
+  --text:       #f5e6c8;
+  --text-muted: #c8a87a;
+  --radius:     8px;
+  --font:       'Segoe UI', system-ui, sans-serif;
+}
+
+html, body {
+  height: 100%;
+  font-family: var(--font);
+  background: var(--bg-deep);
+  color: var(--text);
+  overflow: hidden;
+}
+
+button {
+  font-family: var(--font);
+  cursor: pointer;
+  border: none;
+  outline: none;
+}
+
+input, select {
+  font-family: var(--font);
+  outline: none;
+}
+

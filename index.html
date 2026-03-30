@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Meridian Maps</title>
+  <link rel="stylesheet" href="styles/base.css" />
+  <link rel="stylesheet" href="styles/home.css" />
+  <link rel="stylesheet" href="styles/map.css" />
+</head>
+<body>
+
+  <!-- Home screen: country selector -->
+  <div id="home-container"></div>
+
+  <!-- Map screen: full-screen map for selected country -->
+  <div id="map-container" style="display:none"></div>
+
+  <script type="module">
+    import HomeUI      from './ui/HomeUI.js';
+    import MapUI       from './ui/MapUI.js';
+    import EgyptModule from './modules/egypt/EgyptModule.js';
+
+    // ── Country registry ─────────────────────────────────────────────────────
+    // Add new country modules here — that's the only change needed to extend.
+    const registry = new Map([
+      ['egypt', new EgyptModule()],
+      // ['greece', new GreeceModule()],
+      // ['japan',  new JapanModule()],
+    ]);
+
+    // ── UI instances ─────────────────────────────────────────────────────────
+    const homeEl = document.getElementById('home-container');
+    const mapEl  = document.getElementById('map-container');
+
+    const mapUI = new MapUI(mapEl, () => showHome());
+
+    const homeUI = new HomeUI(homeEl, registry, async (moduleId) => {
+      const module = registry.get(moduleId);
+      if (!module) return;
+      showMap();
+      await mapUI.mount(module);
+    });
+
+    // ── Navigation ────────────────────────────────────────────────────────────
+    function showHome() {
+      mapUI.unmount();
+      mapEl.style.display  = 'none';
+      homeEl.style.display = '';
+    }
+
+    function showMap() {
+      homeEl.style.display = 'none';
+      mapEl.style.display  = '';
+    }
+  </script>
+
+</body>
+</html>

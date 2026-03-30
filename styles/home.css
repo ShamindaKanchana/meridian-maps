@@ -1,0 +1,97 @@
+
+/* ═══════════════════════════════════════════════
+   home.css — HomeUI: country selector grid
+═══════════════════════════════════════════════ */
+
+#home-container {
+  height: 100vh;
+  overflow-y: auto;
+  padding: 40px 24px;
+  background: radial-gradient(ellipse at top, #2a1400 0%, #1a0a00 70%);
+}
+
+.home-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.home-logo {
+  font-size: 3em;
+  margin-bottom: 8px;
+}
+
+.home-title {
+  font-size: 2.2em;
+  font-weight: 700;
+  letter-spacing: 3px;
+  background: linear-gradient(135deg, var(--gold), #fff8e0);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.home-subtitle {
+  color: var(--text-muted);
+  font-size: 1em;
+  margin-top: 6px;
+  letter-spacing: 1px;
+}
+
+.home-search-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 28px;
+}
+
+.home-search {
+  width: 100%;
+  max-width: 420px;
+  padding: 10px 18px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--gold-dark);
+  border-radius: 24px;
+  color: var(--text);
+  font-size: 0.95em;
+}
+
+.home-search::placeholder { color: var(--text-muted); }
+
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+/* Country card */
+.country-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(212,160,23,0.25);
+  border-radius: var(--radius);
+  padding: 16px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, transform 0.15s;
+}
+
+.country-card:hover {
+  background: rgba(212,160,23,0.1);
+  border-color: var(--gold);
+  transform: translateY(-2px);
+}
+
+.country-card.active {
+  border-color: var(--gold);
+  background: rgba(212,160,23,0.15);
+}
+
+.card-flag   { font-size: 2.4em; flex-shrink: 0; }
+.card-body   { flex: 1; min-width: 0; }
+.card-name   { font-size: 1.05em; font-weight: 700; color: var(--gold); }
+.card-sub    { font-size: 0.78em; color: var(--text-muted); margin: 2px 0 6px; }
+.card-desc   { font-size: 0.78em; color: var(--text-muted); line-height: 1.4;
+               white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-arrow  { font-size: 1.4em; color: var(--gold); flex-shrink: 0; opacity: 0.6; }
+
